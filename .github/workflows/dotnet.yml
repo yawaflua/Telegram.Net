@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ "*" ]
 env: 
-  "telegram_test_token": ${{TELEGRAM_TEST_TOKEN}}
+  "telegram_test_token": ${{secrets.TELEGRAM_TEST_TOKEN}}
   
 jobs:
   build:
