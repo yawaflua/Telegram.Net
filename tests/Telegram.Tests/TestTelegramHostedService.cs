@@ -26,10 +26,10 @@ namespace Telegram.Tests
         public void Setup()
         {
             var conf = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", false)
                 .AddEnvironmentVariables()
-                .AddJsonFile("appsettings.json")
                 .Build();
-            Console.WriteLine(conf.GetValue<string>("telegram_test_token"));
             _configMock = new Mock<ITelegramBotConfig>();
             _configMock.Setup(c => c.Token).Returns(conf.GetValue<string>("telegram_test_token"));
             _services = new ServiceCollection();
