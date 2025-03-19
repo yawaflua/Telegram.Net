@@ -8,7 +8,7 @@ public interface ITelegramBotConfig
     /// <summary>
     /// Token of telegram bot. You can take it from @BotFather
     /// </summary>
-    public string Token { internal get; init; }
+    public string Token { get; set; }
     /// <summary>
     /// Custom error handler for bot. You can add custom logger or anything. 
     /// </summary>

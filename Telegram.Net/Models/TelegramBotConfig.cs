@@ -11,7 +11,7 @@ public class TelegramBotConfig : ITelegramBotConfig
         Token = token;
     }
 
-    public string Token { get; init; }
+    public string Token { get; set; }
     public Func<ITelegramBotClient, Exception, CancellationToken, Task>? errorHandler { get; init; }
     public ReceiverOptions? ReceiverOptions { get; init; }
 }

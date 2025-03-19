@@ -29,31 +29,5 @@ public class CallbackAttribute : Attribute
     public CallbackAttribute(string queryId)
     {
         this.QueryId = queryId;
-        
-        var methods = typeof(IUpdatePollingSerivce).GetMethods()
-            .Where(m => m.GetCustomAttribute(this.GetType()) != null);
-
-        foreach (var method in methods)
-        {
-            if (IsValidHandlerMethod(method))
-            {
-                var attr = method.GetCustomAttribute<CallbackAttribute>();
-                var handler = (Func<ITelegramBotClient, CallbackQuery, CancellationToken, Task>)
-                    Delegate.CreateDelegate(typeof(Func<ITelegramBotClient, CallbackQuery, CancellationToken, Task>), null,
-                        method);
-
-                TelegramHostedService.CallbackQueryHandler.Add(attr!.QueryId, handler);
-            }
-        }
-    }
-    
-    static bool IsValidHandlerMethod(MethodInfo method)
-    {
-        var parameters = method.GetParameters();
-        return method.ReturnType == typeof(Task) &&
-               parameters.Length == 3 &&
-               parameters[0].ParameterType == typeof(ITelegramBotClient) &&
-               parameters[1].ParameterType == typeof(CallbackQuery) &&
-               parameters[2].ParameterType == typeof(CancellationToken);
     }
 }

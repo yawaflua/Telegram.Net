@@ -31,30 +31,5 @@ public class InlineAttribute : Attribute
     public InlineAttribute(string inlineId)
     {
         this.InlineId = inlineId;
-        var methods = typeof(IUpdatePollingSerivce).GetMethods()
-            .Where(m => m.GetCustomAttribute(this.GetType()) != null);
-
-        foreach (var method in methods)
-        {
-            if (IsValidHandlerMethod(method))
-            {
-                var attr = method.GetCustomAttribute<InlineAttribute>();
-                var handler = (Func<ITelegramBotClient, InlineQuery, CancellationToken, Task>)
-                    Delegate.CreateDelegate(typeof(Func<ITelegramBotClient, InlineQuery, CancellationToken, Task>), null,
-                        method);
-
-                TelegramHostedService.InlineHandler.Add(attr!.InlineId, handler);
-            }
-        }
-    }
-    
-    static bool IsValidHandlerMethod(MethodInfo method)
-    {
-        var parameters = method.GetParameters();
-        return method.ReturnType == typeof(Task) &&
-               parameters.Length == 3 &&
-               parameters[0].ParameterType == typeof(ITelegramBotClient) &&
-               parameters[1].ParameterType == typeof(InlineQuery) &&
-               parameters[2].ParameterType == typeof(CancellationToken);
     }
 }

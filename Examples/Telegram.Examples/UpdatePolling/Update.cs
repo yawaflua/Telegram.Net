@@ -5,7 +5,7 @@ using Telegram.Net.Interfaces;
 
 namespace Telegram.Examples.UpdatePolling;
 
-public class Update : IUpdatePollingSerivce
+public class Update : IUpdatePollingService
 {
     [Update]
     public async Task UpdateExample(ITelegramBotClient client, Bot.Types.Update update, CancellationToken ctx)
