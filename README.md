@@ -15,7 +15,7 @@ This project provides a set of C# attributes to facilitate the handling of diffe
 Ensure you have the required dependencies installed:
 
 ```sh
- dotnet add package Telegram.Bot
+ dotnet add package yawaflua.Telegram.Net
 ```
 
 ## Usage
@@ -87,4 +87,4 @@ public static async Task HandleUpdate(ITelegramBotClient bot, Update update, Can
 ```
 
 ## License
-This project is open-source and available under the MIT License.
+This project is open-source and available under the [Apache 2.0 License](LICENSE).
