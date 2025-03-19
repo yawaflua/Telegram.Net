@@ -1,0 +1,46 @@
+name: CI/CD NuGet Package
+
+on:
+  release:
+    types: [created]
+
+env:
+  NUGET_SOURCE: https://api.nuget.org/v3/index.json
+  GITHUB_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+
+    - name: Extract Package Version
+      id: get_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "PACKAGE_VERSION=$VERSION" >> $GITHUB_ENV
+        echo "Using version: $VERSION"
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Test
+      run: dotnet test --no-build --verbosity normal --configuration Release
+
+    - name: Pack
+      run: dotnet pack --no-build --configuration Release -p:PackageVersion=${{ env.PACKAGE_VERSION }}
+
+    - name: Publish to GitHub Packages
+      run: dotnet nuget push "**/*.nupkg" --source ${{ env.GITHUB_SOURCE }} --api-key ${{ github.token }}
+
+    - name: Publish to NuGet
+      run: dotnet nuget push "**/*.nupkg" --source ${{ env.NUGET_SOURCE }} --api-key ${{ secrets.NUGET_API_KEY }}
