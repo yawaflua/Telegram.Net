@@ -34,7 +34,7 @@ jobs:
       run: dotnet build --no-restore --configuration Release
 
     - name: Test
-      run: dotnet test --no-build --verbosity normal --configuration Release
+      run: dotnet test --no-build --verbosity normal --configuration Release -e telegram_test_token=${{secrets.TELEGRAM_TEST_TOKEN}}
 
     - name: Pack
       run: dotnet pack --no-build --configuration Release -p:PackageVersion=${{ env.PACKAGE_VERSION }}
