@@ -5,7 +5,9 @@ on:
     branches: [ "*" ]
   pull_request:
     branches: [ "*" ]
-
+env: 
+  "telegram_test_token": ${{TELEGRAM_TEST_TOKEN}}
+  
 jobs:
   build:
     runs-on: ubuntu-latest
