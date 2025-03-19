@@ -7,6 +7,7 @@ on:
 env:
   NUGET_SOURCE: https://api.nuget.org/v3/index.json
   GITHUB_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+  "telegram_test_token": ${{secrets.TELEGRAM_TEST_TOKEN}}
 
 jobs:
   build-and-publish:
