@@ -40,10 +40,10 @@ jobs:
     - name: Pack
       run: dotnet pack --no-build --configuration Release -p:PackageVersion=${{ env.PACKAGE_VERSION }}
     - name: Add GitHub source
-      run: dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github ${{ env.GITHUB_SOURCE }} 
+      run: dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.GHCR_TOKEN }} --store-password-in-clear-text --name github ${{ env.GITHUB_SOURCE }} 
       
     - name: Publish to GitHub Packages
-      run: dotnet nuget push "**/*.nupkg" --api-key ${{ secrets.GITHUB_TOKEN }} --source "github"
+      run: dotnet nuget push "**/*.nupkg" --source "github"
     
     - name: Publish to NuGet
       run: dotnet nuget push "**/*.nupkg" --source ${{ env.NUGET_SOURCE }} --api-key ${{ secrets.NUGET_API_KEY }}
