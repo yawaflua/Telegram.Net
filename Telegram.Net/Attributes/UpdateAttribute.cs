@@ -21,29 +21,5 @@ public class UpdateAttribute : Attribute
     public bool IsReusable => true;
     public UpdateAttribute()
     {
-        var methods = typeof(IUpdatePollingSerivce).GetMethods()
-            .Where(m => m.GetCustomAttribute(this.GetType()) != null);
-
-        foreach (var method in methods)
-        {
-            if (IsValidHandlerMethod(method))
-            {
-                var handler = (Func<ITelegramBotClient, Update, CancellationToken, Task>)
-                    Delegate.CreateDelegate(typeof(Func<ITelegramBotClient, Update, CancellationToken, Task>), null,
-                        method);
-
-                TelegramHostedService.DefaultUpdateHandler.Add(handler);
-            }
-        }
-    }
-    
-    static bool IsValidHandlerMethod(MethodInfo method)
-    {
-        var parameters = method.GetParameters();
-        return method.ReturnType == typeof(Task) &&
-               parameters.Length == 3 &&
-               parameters[0].ParameterType == typeof(ITelegramBotClient) &&
-               parameters[1].ParameterType == typeof(Update) &&
-               parameters[2].ParameterType == typeof(CancellationToken);
     }
 }

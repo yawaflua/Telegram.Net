@@ -8,7 +8,7 @@ public static class ServiceBindings
 {
     public static IServiceCollection ConnectTelegram(this IServiceCollection isc, TelegramBotConfig config)
     {
-        isc.AddHostedService<TelegramHostedService>(k => new(config));
+        isc.AddHostedService<TelegramHostedService>(k => new(config, isc));
         return isc;
     }
 }

@@ -22,29 +22,5 @@ public class PreCheckoutAttribute : Attribute
     public bool IsReusable => true;
     public PreCheckoutAttribute()
     {
-        var methods = typeof(IUpdatePollingSerivce).GetMethods()
-            .Where(m => m.GetCustomAttribute(this.GetType()) != null);
-
-        foreach (var method in methods)
-        {
-            if (IsValidHandlerMethod(method))
-            {
-                var handler = (Func<ITelegramBotClient, PreCheckoutQuery, CancellationToken, Task>)
-                    Delegate.CreateDelegate(typeof(Func<ITelegramBotClient, PreCheckoutQuery, CancellationToken, Task>), null,
-                        method);
-
-                TelegramHostedService.PreCheckoutHandler = (handler);
-            }
-        }
-    }
-    
-    static bool IsValidHandlerMethod(MethodInfo method)
-    {
-        var parameters = method.GetParameters();
-        return method.ReturnType == typeof(Task) &&
-               parameters.Length == 3 &&
-               parameters[0].ParameterType == typeof(ITelegramBotClient) &&
-               parameters[1].ParameterType == typeof(PreCheckoutQuery) &&
-               parameters[2].ParameterType == typeof(CancellationToken);
     }
 }

@@ -3,7 +3,7 @@
 /// <summary>
 /// You should implement this interface in all your classes with update polling logic
 /// </summary>
-public interface IUpdatePollingSerivce
+public interface IUpdatePollingService
 {
     
 }
