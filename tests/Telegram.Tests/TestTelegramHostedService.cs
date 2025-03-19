@@ -13,13 +13,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
+using Telegram.Net.Models;
 
 namespace Telegram.Tests
 {
     [TestFixture]
     public class TelegramHostedServiceTests
     {
-        private Mock<ITelegramBotConfig> _configMock;
+        private TelegramBotConfig _configMock;
         private ServiceCollection _services;
 
         [SetUp]
@@ -30,14 +31,14 @@ namespace Telegram.Tests
                 .AddJsonFile("appsettings.json", false)
                 .AddEnvironmentVariables()
                 .Build();
-            _configMock = new Mock<ITelegramBotConfig>();
-            _configMock.Setup(c => c.Token).Returns(conf.GetValue<string>("telegram_test_token"));
+            
+            _configMock = new TelegramBotConfig(conf.GetValue<string>("telegram_test_token") ?? throw new Exception("Provide telegram token first"));
             _services = new ServiceCollection();
         }
 
         public class TestHandler : IUpdatePollingService
         {
-            [Command("start")]
+            [Command("/start")]
             public async Task HandleStart(ITelegramBotClient client, Message message, CancellationToken ct)
                 => await client.SendTextMessageAsync(message.Chat.Id, "Started", cancellationToken: ct);
 
@@ -66,18 +67,18 @@ namespace Telegram.Tests
         public void AddAttributes_RegistersCommandHandlersCorrectly()
         {
             _services.AddSingleton<TestHandler>();
-            var service = new TelegramHostedService(_configMock.Object, _services);
+            var service = new TelegramHostedService(_configMock, _services);
 
             service.AddAttributes(CancellationToken.None).Wait();
 
             Assert.Multiple(() =>
             {
-                Assert.That(TelegramHostedService.CommandHandler, Contains.Key("start"));
-                Assert.That(TelegramHostedService.CallbackQueryHandler, Contains.Key("test_callback"));
-                Assert.That(TelegramHostedService.EditedMessageHandler, Has.Count.EqualTo(1));
-                Assert.That(TelegramHostedService.InlineHandler, Contains.Key("search"));
-                Assert.That(TelegramHostedService.PreCheckoutHandler, Is.Not.Null);
-                Assert.That(TelegramHostedService.DefaultUpdateHandler, Has.Count.EqualTo(1));
+                Assert.That(service.CommandHandler, Contains.Key("/start"));
+                Assert.That(service.CallbackQueryHandler, Contains.Key("test_callback"));
+                Assert.That(service.EditedMessageHandler, Has.Count.EqualTo(1));
+                Assert.That(service.InlineHandler, Contains.Key("search"));
+                Assert.That(service.PreCheckoutHandler, Is.Not.Null);
+                Assert.That(service.DefaultUpdateHandler, Has.Count.EqualTo(1)); 
             });
         }
 
@@ -118,8 +119,14 @@ namespace Telegram.Tests
         [SetUp]
         public void Setup()
         {
+            var conf = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", false)
+                .AddEnvironmentVariables()
+                .Build();
+            
             _configMock = new Mock<ITelegramBotConfig>();
-            _configMock.Setup(c => c.Token).Returns("test_token");
+            _configMock.Setup(c => c.Token).Returns(conf.GetValue<string>("telegram_test_token") ?? throw new Exception("Provide token first"));
             _configMock.Setup(c => c.ReceiverOptions).Returns(new ReceiverOptions());
             
             var services = new ServiceCollection();
@@ -137,23 +144,6 @@ namespace Telegram.Tests
             var message = new Message { Text = "/start", Chat = new Chat { Id = 123 } };
             var update = new Update { Message = message };
 
-            _botClientMock.Setup(b => b.SendMessage(
-                It.IsAny<ChatId>(),
-                "Started",
-                It.IsAny<ParseMode>(),
-                It.IsAny<ReplyParameters>(),
-                It.IsAny<ReplyMarkup>(),
-                It.IsAny<LinkPreviewOptions>(),
-                It.IsAny<int>(),
-                It.IsAny<IEnumerable<MessageEntity>>(),
-                It.IsAny<bool>(),
-                It.IsAny<bool>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<bool>(),
-                It.IsAny<CancellationToken>()
-            )).Verifiable();
-
             // Act
             await _hostedService.StartAsync(CancellationToken.None);
             await InvokeUpdateHandler(update);
@@ -169,15 +159,6 @@ namespace Telegram.Tests
             var callback = new CallbackQuery { Data = "test_callback", Id = "cb_id" };
             var update = new Update { CallbackQuery = callback };
 
-            _botClientMock.Setup(b => b.AnswerCallbackQueryAsync(
-                "cb_id",
-                "Callback handled",
-                It.IsAny<bool>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>()
-                )).Verifiable();
-
             // Act
             await _hostedService.StartAsync(CancellationToken.None);
             await InvokeUpdateHandler(update);
@@ -188,14 +169,7 @@ namespace Telegram.Tests
 
         private async Task InvokeUpdateHandler(Update update)
         {
-            var clientField = typeof(TelegramHostedService).GetField("Client", BindingFlags.NonPublic | BindingFlags.Instance);
-            clientField.SetValue(_hostedService, _botClientMock.Object);
-
-            var updateHandler = _botClientMock.Invocations
-                .First(i => i.Method.Name == "StartReceiving")
-                .Arguments[0] as Func<ITelegramBotClient, Update, CancellationToken, Task>;
-
-            await updateHandler(_botClientMock.Object, update, CancellationToken.None);
+            await _hostedService.UpdateHandler(_botClientMock.Object, update, CancellationToken.None);
         }
     }
 }

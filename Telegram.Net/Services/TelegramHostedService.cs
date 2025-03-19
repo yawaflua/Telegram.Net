@@ -14,14 +14,14 @@ namespace Telegram.Net.Services;
 public class TelegramHostedService : IHostedService
 {
     private IServiceCollection isc { get; }
-    private TelegramBotClient Client { get; }
+    internal TelegramBotClient Client { get; set; }
     private ITelegramBotConfig Config { get; }
-    internal static Dictionary<string, Func<ITelegramBotClient, Message, CancellationToken, Task>> CommandHandler { get; } = new();
-    internal static List<Func<ITelegramBotClient, Message, CancellationToken, Task>> EditedMessageHandler { get; } = new();
-    internal static Dictionary<string, Func<ITelegramBotClient, CallbackQuery,CancellationToken, Task>> CallbackQueryHandler { get; } = new();
-    internal static Dictionary<string, Func<ITelegramBotClient, InlineQuery ,CancellationToken, Task>> InlineHandler { get; } = new();
-    internal static Func<ITelegramBotClient, PreCheckoutQuery,CancellationToken, Task>? PreCheckoutHandler { get; set; }
-    internal static List<Func<ITelegramBotClient, Update, CancellationToken, Task>> DefaultUpdateHandler { get; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, Message, CancellationToken, Task>> CommandHandler { get; } = new();
+    internal List<Func<ITelegramBotClient, Message, CancellationToken, Task>> EditedMessageHandler { get; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, CallbackQuery,CancellationToken, Task>> CallbackQueryHandler { get; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, InlineQuery ,CancellationToken, Task>> InlineHandler { get; } = new();
+    internal Func<ITelegramBotClient, PreCheckoutQuery,CancellationToken, Task>? PreCheckoutHandler { get; set; }
+    internal List<Func<ITelegramBotClient, Update, CancellationToken, Task>> DefaultUpdateHandler { get; } = new();
 
     public TelegramHostedService(ITelegramBotConfig config, IServiceCollection isc)
     {
@@ -47,10 +47,8 @@ public class TelegramHostedService : IHostedService
 
     internal async Task AddAttributes(CancellationToken cancellationToken)
     {
-        var mutex = new Mutex();
         await Task.Run(async () =>
         {
-            mutex.WaitOne();
             var implementations = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
                 .Where(t => typeof(IUpdatePollingService).IsAssignableFrom(t) && !t.IsInterface);
@@ -82,7 +80,7 @@ public class TelegramHostedService : IHostedService
                     if (IsValidHandlerMethod(method, typeof(Message)))
                     {
                         var handler = CreateDelegate<Message>(method);
-                        CommandHandler.Add(commandAttr.Command, handler);
+                        CommandHandler.TryAdd(commandAttr.Command, handler);
                     }
                     continue;
                 }
@@ -93,7 +91,7 @@ public class TelegramHostedService : IHostedService
                     if (IsValidHandlerMethod(method, typeof(CallbackQuery)))
                     {
                         var handler = CreateDelegate<CallbackQuery>(method);
-                        CallbackQueryHandler.Add(callbackAttr.QueryId, handler);
+                        CallbackQueryHandler.TryAdd(callbackAttr.QueryId, handler);
                     }
                     continue;
                 }
@@ -115,7 +113,7 @@ public class TelegramHostedService : IHostedService
                     if (IsValidHandlerMethod(method, typeof(InlineQuery)))
                     {
                         var handler = CreateDelegate<InlineQuery>(method);
-                        InlineHandler.Add(inlineAttr.InlineId, handler);
+                        InlineHandler.TryAdd(inlineAttr.InlineId, handler);
                     }
                     continue;
                 }
@@ -142,44 +140,44 @@ public class TelegramHostedService : IHostedService
                     continue;
                 }
             }
-            mutex.ReleaseMutex();
         }, cancellationToken);
     }
     
+    
+    internal async Task UpdateHandler(ITelegramBotClient client, Update update, CancellationToken ctx)
+    {
+        switch (update)
+        {
+            case { Message: { } message }:
+                await CommandHandler.FirstOrDefault(k => message.Text!.StartsWith(k.Key)).Value(client, message, ctx);
+                break;
+            case { EditedMessage: { } message }:
+                EditedMessageHandler.ForEach(async k => await k(client, message, ctx));
+                break;
+            case { CallbackQuery: { } callbackQuery }:
+                await CallbackQueryHandler.FirstOrDefault(k => callbackQuery.Data!.StartsWith(k.Key)).Value(client, callbackQuery, ctx);
+                break;
+            case { InlineQuery: { } inlineQuery }:
+                await InlineHandler.FirstOrDefault(k => inlineQuery.Id.StartsWith(k.Key)).Value(client, inlineQuery, ctx);
+                break;
+            case { PreCheckoutQuery: { } preCheckoutQuery }:
+                if (PreCheckoutHandler != null) await PreCheckoutHandler(client, preCheckoutQuery, ctx);
+                break;
+            default:
+                DefaultUpdateHandler.ForEach(async k => await k(client, update, ctx));
+                break;
+        }
+    }
     
     [SuppressMessage("ReSharper", "AsyncVoidLambda")]
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await AddAttributes(cancellationToken);
-        
-        
+
+
+
         Client.StartReceiving(
-            async (client, update, ctx) =>
-            {
-                switch (update)
-                {
-                    case { Message: { } message }:
-                        await CommandHandler.FirstOrDefault(k => message.Text!.StartsWith(k.Key)).Value(client, message, cancellationToken);
-                        break;
-                    case { EditedMessage: { } message }:
-                        EditedMessageHandler.ForEach(async k => await k(client, message, cancellationToken));
-                        break;
-                    case { CallbackQuery: { } callbackQuery }:
-                        await CallbackQueryHandler.FirstOrDefault(k => callbackQuery.Data!.StartsWith(k.Key)).Value(client, callbackQuery, cancellationToken);
-                        break;
-                    case { InlineQuery: { } inlineQuery }:
-                        await InlineHandler.FirstOrDefault(k => inlineQuery.Id.StartsWith(k.Key)).Value(client, inlineQuery, cancellationToken);
-                        break;
-                    case {PreCheckoutQuery: { } preCheckoutQuery}:
-                        if (PreCheckoutHandler != null)
-                            await PreCheckoutHandler(client, preCheckoutQuery, cancellationToken);
-                        break;
-                    default:
-                        DefaultUpdateHandler.ForEach(async k => await k(client, update, ctx));
-                        break;
-                }
-                
-            },
+            UpdateHandler,
             Config.errorHandler ?? ((_, _, _) => Task.CompletedTask),
             Config.ReceiverOptions,
             cancellationToken);
