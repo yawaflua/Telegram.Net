@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Telegram.Net", "Telegram.Net\Telegram.Net.csproj", "{137609A1-3482-465E-9B76-7E3F78FFC906}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Telegram.Examples", "Examples\Telegram.Examples\Telegram.Examples.csproj", "{073E66F2-F82E-4378-B390-C2364DFDC491}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{137609A1-3482-465E-9B76-7E3F78FFC906}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{137609A1-3482-465E-9B76-7E3F78FFC906}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{137609A1-3482-465E-9B76-7E3F78FFC906}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{137609A1-3482-465E-9B76-7E3F78FFC906}.Release|Any CPU.Build.0 = Release|Any CPU
+		{073E66F2-F82E-4378-B390-C2364DFDC491}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{073E66F2-F82E-4378-B390-C2364DFDC491}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{073E66F2-F82E-4378-B390-C2364DFDC491}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{073E66F2-F82E-4378-B390-C2364DFDC491}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
