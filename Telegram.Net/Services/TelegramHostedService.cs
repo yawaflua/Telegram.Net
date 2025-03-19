@@ -29,7 +29,7 @@ public class TelegramHostedService : IHostedService
         Config = config;
         this.isc = isc;
     }
-    private static bool IsValidHandlerMethod(MethodInfo method, Type parameterType)
+    internal static bool IsValidHandlerMethod(MethodInfo method, Type parameterType)
     {
         var parameters = method.GetParameters();
         return method.ReturnType == typeof(Task) &&
@@ -39,7 +39,7 @@ public class TelegramHostedService : IHostedService
                parameters[2].ParameterType == typeof(CancellationToken);
     }
 
-    private static Func<ITelegramBotClient, T, CancellationToken, Task> CreateDelegate<T>(MethodInfo method)
+    internal static Func<ITelegramBotClient, T, CancellationToken, Task> CreateDelegate<T>(MethodInfo method)
     {
         var delegateType = typeof(Func<ITelegramBotClient, T, CancellationToken, Task>);
         return (Delegate.CreateDelegate(delegateType, null, method) as Func<ITelegramBotClient, T, CancellationToken, Task>)!;
