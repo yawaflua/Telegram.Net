@@ -240,7 +240,11 @@ public class TelegramHostedService : IHostedService
 
             Client.StartReceiving(
                 UpdateHandler,
-                Config.errorHandler ?? ((_, _, _) => Task.CompletedTask),
+                Config.errorHandler ?? ((_, ex, _) =>
+                {
+                    _logger.LogError(ex, "Catched error in telegram bot working: ");
+                    return Task.CompletedTask;
+                }),
                 Config.ReceiverOptions,
                 cancellationToken);
         }
