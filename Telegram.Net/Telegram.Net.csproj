@@ -5,7 +5,7 @@
         <TargetFramework>net7.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <Version>1.0.0</Version>
+        <Version>1.0.2</Version>
         <Authors>yawaflua</Authors>
         <Title>yawaflua.Telegram.Net</Title>
         <Description>Telegram.Bots extender pack, what provides to user attributes, which can used with services</Description>

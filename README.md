@@ -20,6 +20,20 @@ Ensure you have the required dependencies installed:
 
 ## Usage
 
+### Provide dependencies in class
+You can provide dependencies in class from constructor, and after it use it like `static`.
+```csharp
+public class Example : IUpdatePollingService
+{
+    private static MyCoolService _service; // It should to be static!
+    
+    public Example(MyCoolService service)
+    {
+        _service = service;
+    }
+}
+```
+
 ### Inline Query Handling
 Use the `InlineAttribute` to register a method as an inline query handler.
 

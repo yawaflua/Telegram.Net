@@ -1,4 +1,5 @@
-﻿using Telegram.Bot;
+﻿using Microsoft.Extensions.Configuration;
+using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Net.Attributes;
 using Telegram.Net.Interfaces;
@@ -7,6 +8,11 @@ namespace Telegram.Examples.UpdatePolling;
 
 public class Update : IUpdatePollingService
 {
+    private static IConfiguration _conf;
+    public Update(IConfiguration conf)
+    {
+        _conf = conf;
+    }
     [Update]
     public async Task UpdateExample(ITelegramBotClient client, Bot.Types.Update update, CancellationToken ctx)
     {
@@ -29,6 +35,12 @@ public class Update : IUpdatePollingService
             await client.SendMessage(message.From!.Id, "Hello, I`m example bot. And this - command with subparam", cancellationToken: ctx);
         else
             await client.SendMessage(message.From!.Id, "Hello, I`m example bot.", cancellationToken: ctx);
+    }
+
+    [Command("/test_conf")]
+    public async Task TestConfigurationBuilder(ITelegramBotClient client, Message message, CancellationToken cts)
+    {
+        await client.SendMessage(message.Chat.Id, _conf.GetValue<string>("ExampleMessage") ?? throw new Exception("Not found"));
     }
 
     [EditMessage]
