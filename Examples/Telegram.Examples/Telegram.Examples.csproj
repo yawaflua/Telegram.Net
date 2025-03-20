@@ -11,6 +11,9 @@
     <ItemGroup>
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.3" />
         <ProjectReference Include="..\..\Telegram.Net\Telegram.Net.csproj" />
+        
+        <None CopyToOutputDirectory="Always" Include="appsettings.json"></None>
     </ItemGroup>
+    
 
 </Project>

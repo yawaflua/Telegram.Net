@@ -9,6 +9,8 @@ using Telegram.Bot.Types;
 using Telegram.Bot.Types.Payments;
 using Telegram.Net.Attributes;
 using Telegram.Net.Interfaces;
+using static System.Reflection.BindingFlags;
+
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 
 namespace Telegram.Net.Services;
@@ -73,116 +75,85 @@ public class TelegramHostedService : IHostedService
         }
 
     }
-
+    
+    
+    
     internal async Task AddAttributes(CancellationToken cancellationToken)
     {
         await Task.Run(async () =>
         {
             try
             {
-                var implementations = AppDomain.CurrentDomain.GetAssemblies()
+                var attributeTypes = new HashSet<Type>
+                {
+                    typeof(CommandAttribute),
+                    typeof(CallbackAttribute),
+                    typeof(EditMessageAttribute),
+                    typeof(InlineAttribute),
+                    typeof(PreCheckoutAttribute),
+                    typeof(UpdateAttribute)
+                };
+
+                var methods = AppDomain.CurrentDomain.GetAssemblies()
                     .SelectMany(a => a.GetTypes())
-                    .Where(t => typeof(IUpdatePollingService).IsAssignableFrom(t) && !t.IsInterface);
+                    .Where(t => typeof(IUpdatePollingService).IsAssignableFrom(t) && !t.IsInterface)
+                    .SelectMany(t => t.GetMethods(Instance | 
+                                                  Public | 
+                                                  NonPublic | 
+                                                  DeclaredOnly))
+                    .Where(m => m.GetCustomAttributes().Any(a => attributeTypes.Contains(a.GetType())))
+                    .ToList();
 
-                foreach (var implementation in implementations)
+                if (methods.Count == 0)
                 {
-                    isc.AddScoped(implementation);
-                }
-
-                var methods = implementations
-                    .SelectMany(t => t.GetMethods(
-                        BindingFlags.Instance |
-                        BindingFlags.Public | BindingFlags.NonPublic |
-                        BindingFlags.DeclaredOnly))
-                    .Where(m =>
-                        m.GetCustomAttribute<CommandAttribute>() != null ||
-                        m.GetCustomAttribute<CallbackAttribute>() != null ||
-                        m.GetCustomAttribute<EditMessageAttribute>() != null ||
-                        m.GetCustomAttribute<InlineAttribute>() != null ||
-                        m.GetCustomAttribute<PreCheckoutAttribute>() != null ||
-                        m.GetCustomAttribute<UpdateAttribute>() != null);
-                
-                if (methods.Count() == 0)
-                {
-                    _logger.LogWarning("Not founded methods with attributes.");
+                    _logger.LogWarning("No methods found with required attributes");
                 }
                 
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                var isp = isc.BuildServiceProvider();
                 foreach (var method in methods)
                 {
-                    var commandAttr = method.GetCustomAttribute<CommandAttribute>();
-                    if (commandAttr != null)
-                    {
-                        if (IsValidHandlerMethod(method, typeof(Message)))
-                        {
-                            var handler = CreateDelegate<Message>(method);
-                            if (!CommandHandler.TryAdd(commandAttr.Command, handler))
-                                throw new Exception($"Failed to add in commandHandler: {commandAttr.Command}");
-                        }
+                    var declaringType = method.DeclaringType!;
+                    var constructor = declaringType.GetConstructors()[0];
+                    var parameters = constructor.GetParameters()
+                        .Select(param => isp.GetRequiredService(param.ParameterType))
+                        .ToArray();
+    
+                    constructor.Invoke(parameters);
 
-                        continue;
+                    void AddHandler<T>(Dictionary<string, Func<ITelegramBotClient, T, CancellationToken, Task>> dictionary, string key) where T : class
+                    {
+                        if (!IsValidHandlerMethod(method, typeof(T))) return;
+        
+                        var handler = CreateDelegate<T>(method);
+                        if (!dictionary.TryAdd(key, handler))
+                            throw new Exception($"Failed to add {key} to {dictionary.GetType().Name}");
                     }
 
-                    var callbackAttr = method.GetCustomAttribute<CallbackAttribute>();
-                    if (callbackAttr != null)
+                    switch (method.GetCustomAttributes().FirstOrDefault())
                     {
-                        if (IsValidHandlerMethod(method, typeof(CallbackQuery)))
-                        {
-                            var handler = CreateDelegate<CallbackQuery>(method);
-                            if (!CallbackQueryHandler.TryAdd(callbackAttr.QueryId, handler))
-                                throw new Exception($"Failed to add in callbacKQuery: {callbackAttr.QueryId}");;
-                        }
-
-                        continue;
-                    }
-
-                    var editMessageAttr = method.GetCustomAttribute<EditMessageAttribute>();
-                    if (editMessageAttr != null)
-                    {
-                        if (IsValidHandlerMethod(method, typeof(Message)))
-                        {
-                            var handler = CreateDelegate<Message>(method);
-                            EditedMessageHandler.Add(handler);
-                        }
-
-                        continue;
-                    }
-
-                    var inlineAttr = method.GetCustomAttribute<InlineAttribute>();
-                    if (inlineAttr != null)
-                    {
-                        if (IsValidHandlerMethod(method, typeof(InlineQuery)))
-                        {
-                            var handler = CreateDelegate<InlineQuery>(method);
-                            if (!InlineHandler.TryAdd(inlineAttr.InlineId, handler))
-                                throw new Exception($"Failed to add in inlineHandler: {inlineAttr.InlineId}");;
-                        }
-
-                        continue;
-                    }
-
-                    var preCheckoutAttr = method.GetCustomAttribute<PreCheckoutAttribute>();
-                    if (preCheckoutAttr != null)
-                    {
-                        if (IsValidHandlerMethod(method, typeof(PreCheckoutQuery)))
-                        {
-                            var handler = CreateDelegate<PreCheckoutQuery>(method);
-                            PreCheckoutHandler = handler;
-                        }
-
-                        continue;
-                    }
-
-                    var updateAttr = method.GetCustomAttribute<UpdateAttribute>();
-                    if (updateAttr != null)
-                    {
-                        if (IsValidHandlerMethod(method, typeof(Update)))
-                        {
-                            var handler = CreateDelegate<Update>(method);
-                            DefaultUpdateHandler.Add(handler);
-                        }
-
-                        continue;
+                        case CommandAttribute command:
+                            AddHandler(CommandHandler, command.Command);
+                            break;
+        
+                        case CallbackAttribute callback:
+                            AddHandler(CallbackQueryHandler, callback.QueryId);
+                            break;
+        
+                        case EditMessageAttribute _ when IsValidHandlerMethod(method, typeof(Message)):
+                            EditedMessageHandler.Add(CreateDelegate<Message>(method));
+                            break;
+        
+                        case InlineAttribute inline:
+                            AddHandler(InlineHandler, inline.InlineId);
+                            break;
+        
+                        case PreCheckoutAttribute _ when IsValidHandlerMethod(method, typeof(PreCheckoutQuery)):
+                            PreCheckoutHandler = CreateDelegate<PreCheckoutQuery>(method);
+                            break;
+        
+                        case UpdateAttribute _ when IsValidHandlerMethod(method, typeof(Update)):
+                            DefaultUpdateHandler.Add(CreateDelegate<Update>(method));
+                            break;
                     }
                 }
             }

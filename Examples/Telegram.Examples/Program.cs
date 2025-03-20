@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Telegram.Net;
@@ -7,12 +8,11 @@ var webHost = Host.CreateDefaultBuilder()
     .ConfigureLogging(l => l.ClearProviders().AddConsole())
     .ConfigureServices(k =>
     {
-        k.ConnectTelegram(new("TOKEN")
-        {
-            errorHandler = async (client, exception, ctx) =>
-            {
-                Console.WriteLine(exception);
-            }
-        });
+        var _conf = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json")
+            .AddEnvironmentVariables()
+            .Build();
+        k.AddSingleton(_conf);
+        k.ConnectTelegram(new(_conf.GetValue<string>("telegram_test_token")));
     });
 webHost.Build().Run();
