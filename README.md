@@ -86,5 +86,9 @@ public static async Task HandleUpdate(ITelegramBotClient bot, Update update, Can
 }
 ```
 
+### We know about this bugs:
+- [ ] Not working providing dependencies in class constructor and this gives an error.
+      Try to not use provided dependencies in class. We are should to fix it in v1.0.2.
+
 ## License
 This project is open-source and available under the [Apache 2.0 License](LICENSE).
