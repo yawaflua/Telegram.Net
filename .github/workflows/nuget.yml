@@ -7,6 +7,7 @@ on:
 env:
   NUGET_SOURCE: https://api.nuget.org/v3/index.json
   GITHUB_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+  "telegram_test_token": ${{secrets.TELEGRAM_TEST_TOKEN}}
 
 jobs:
   build-and-publish:
@@ -32,15 +33,17 @@ jobs:
 
     - name: Build
       run: dotnet build --no-restore --configuration Release
-
+    
     - name: Test
-      run: dotnet test --no-build --verbosity normal --configuration Release
+      run: dotnet test --no-build --verbosity normal --configuration Release -e telegram_test_token=${{secrets.TELEGRAM_TEST_TOKEN}}
 
     - name: Pack
       run: dotnet pack --no-build --configuration Release -p:PackageVersion=${{ env.PACKAGE_VERSION }}
-
+    - name: Add GitHub source
+      run: dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.GHCR_TOKEN }} --store-password-in-clear-text --name github ${{ env.GITHUB_SOURCE }} 
+      
     - name: Publish to GitHub Packages
-      run: dotnet nuget push "**/*.nupkg" --source ${{ env.GITHUB_SOURCE }} --api-key ${{ github.token }}
-
+      run: dotnet nuget push "**/*.nupkg" --source "github"
+    
     - name: Publish to NuGet
       run: dotnet nuget push "**/*.nupkg" --source ${{ env.NUGET_SOURCE }} --api-key ${{ secrets.NUGET_API_KEY }}
