@@ -20,12 +20,12 @@ public class TelegramHostedService : IHostedService
     private IServiceCollection isc { get; }
     internal TelegramBotClient Client { get; set; }
     private ITelegramBotConfig Config { get; }
-    internal Dictionary<string, Func<ITelegramBotClient, Message, CancellationToken, Task>> CommandHandler { get; } = new();
-    internal List<Func<ITelegramBotClient, Message, CancellationToken, Task>> EditedMessageHandler { get; } = new();
-    internal Dictionary<string, Func<ITelegramBotClient, CallbackQuery,CancellationToken, Task>> CallbackQueryHandler { get; } = new();
-    internal Dictionary<string, Func<ITelegramBotClient, InlineQuery ,CancellationToken, Task>> InlineHandler { get; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, Message, CancellationToken, Task>> CommandHandler { get; set; } = new();
+    internal List<Func<ITelegramBotClient, Message, CancellationToken, Task>> EditedMessageHandler { get; set; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, CallbackQuery,CancellationToken, Task>> CallbackQueryHandler { get; set; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, InlineQuery ,CancellationToken, Task>> InlineHandler { get; set; } = new();
     internal Func<ITelegramBotClient, PreCheckoutQuery,CancellationToken, Task>? PreCheckoutHandler { get; set; }
-    internal List<Func<ITelegramBotClient, Update, CancellationToken, Task>> DefaultUpdateHandler { get; } = new();
+    internal List<Func<ITelegramBotClient, Update, CancellationToken, Task>> DefaultUpdateHandler { get; set; } = new();
     internal static ILogger<TelegramHostedService> _logger;
     
     public TelegramHostedService(ITelegramBotConfig config, IServiceCollection isc, ILogger<TelegramHostedService> logger)
@@ -120,31 +120,28 @@ public class TelegramHostedService : IHostedService
     
                     constructor.Invoke(parameters);
 
-                    void AddHandler<T>(Dictionary<string, Func<ITelegramBotClient, T, CancellationToken, Task>> dictionary, string key) where T : class
+                    switch (method.GetCustomAttributes().First(t => attributeTypes.Contains(t.GetType())))
                     {
-                        if (!IsValidHandlerMethod(method, typeof(T))) return;
-        
-                        var handler = CreateDelegate<T>(method);
-                        if (!dictionary.TryAdd(key, handler))
-                            throw new Exception($"Failed to add {key} to {dictionary.GetType().Name}");
-                    }
-
-                    switch (method.GetCustomAttributes().FirstOrDefault())
-                    {
-                        case CommandAttribute command:
-                            AddHandler(CommandHandler, command.Command);
+                        case CommandAttribute command when IsValidHandlerMethod(method, typeof(Message)):
+                            var commandHandler = CreateDelegate<Message>(method);
+                            if (!CommandHandler.TryAdd(command.Command, commandHandler))
+                                throw new Exception($"Failed to add command: {command.Command}");
                             break;
         
-                        case CallbackAttribute callback:
-                            AddHandler(CallbackQueryHandler, callback.QueryId);
+                        case CallbackAttribute callback when IsValidHandlerMethod(method, typeof(CallbackQuery)):
+                            var callbackHandler = CreateDelegate<CallbackQuery>(method);
+                            if (!CallbackQueryHandler.TryAdd(callback.QueryId, callbackHandler))
+                                throw new Exception($"Failed to add callback: {callback.QueryId}");
                             break;
         
                         case EditMessageAttribute _ when IsValidHandlerMethod(method, typeof(Message)):
                             EditedMessageHandler.Add(CreateDelegate<Message>(method));
                             break;
         
-                        case InlineAttribute inline:
-                            AddHandler(InlineHandler, inline.InlineId);
+                        case InlineAttribute inline when IsValidHandlerMethod(method, typeof(InlineQuery)):
+                            var inlineHandler = CreateDelegate<InlineQuery>(method);
+                            if (!InlineHandler.TryAdd(inline.InlineId, inlineHandler))
+                                throw new Exception($"Failed to add inline: {inline.InlineId}");
                             break;
         
                         case PreCheckoutAttribute _ when IsValidHandlerMethod(method, typeof(PreCheckoutQuery)):
