@@ -10,6 +10,7 @@ using Telegram.Net.Services;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -22,6 +23,7 @@ namespace Telegram.Tests
     {
         private TelegramBotConfig _configMock;
         private ServiceCollection _services;
+        private ILogger<TelegramHostedService> logger;
 
         [SetUp]
         public void Setup()
@@ -31,7 +33,8 @@ namespace Telegram.Tests
                 .AddJsonFile("appsettings.json", false)
                 .AddEnvironmentVariables()
                 .Build();
-            
+            var loggerFactory = new LoggerFactory();
+            logger = loggerFactory.CreateLogger<TelegramHostedService>();
             _configMock = new TelegramBotConfig(conf.GetValue<string>("telegram_test_token") ?? throw new Exception("Provide telegram token first"));
             _services = new ServiceCollection();
         }
@@ -67,7 +70,7 @@ namespace Telegram.Tests
         public void AddAttributes_RegistersCommandHandlersCorrectly()
         {
             _services.AddSingleton<TestHandler>();
-            var service = new TelegramHostedService(_configMock, _services);
+            var service = new TelegramHostedService(_configMock, _services, logger);
 
             service.AddAttributes(CancellationToken.None).Wait();
 
@@ -132,8 +135,8 @@ namespace Telegram.Tests
             var services = new ServiceCollection();
             services.AddSingleton<TelegramHostedServiceTests.TestHandler>();
             _botClientMock = new Mock<ITelegramBotClient>();
-            
-            _hostedService = new TelegramHostedService(_configMock.Object, services);
+            var logger = new LoggerFactory().CreateLogger<TelegramHostedService>();
+            _hostedService = new TelegramHostedService(_configMock.Object, services, logger);
             _hostedService.AddAttributes(CancellationToken.None).Wait();
         }
 
