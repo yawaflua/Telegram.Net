@@ -169,19 +169,29 @@ public class TelegramHostedService : IHostedService
             switch (update)
             {
                 case { Message: { } message }:
-                    await CommandHandler.FirstOrDefault(k => message.Text!.StartsWith(k.Key))
-                        .Value(client, message, ctx);
+                    CommandHandler.Where(k => message.Text!.StartsWith(k.Key)).Select(async k =>
+                    {
+                        await k.Value(client, message, ctx);
+                        return k;
+                    });
                     break;
                 case { EditedMessage: { } message }:
                     EditedMessageHandler.ForEach(async k => await k(client, message, ctx));
                     break;
                 case { CallbackQuery: { } callbackQuery }:
-                    await CallbackQueryHandler.FirstOrDefault(k => callbackQuery.Data!.StartsWith(k.Key))
-                        .Value(client, callbackQuery, ctx);
+                    CallbackQueryHandler.Where(k => callbackQuery.Data!.StartsWith(k.Key))
+                        .Select(async k =>
+                        {
+                            await k.Value(client, callbackQuery, ctx);
+                            return k;
+                        });
                     break;
                 case { InlineQuery: { } inlineQuery }:
-                    await InlineHandler.FirstOrDefault(k => inlineQuery.Id.StartsWith(k.Key))
-                        .Value(client, inlineQuery, ctx);
+                    InlineHandler.Where(k => inlineQuery.Id.StartsWith(k.Key)).Select(async k =>
+                    {
+                        await k.Value(client, inlineQuery, ctx);
+                        return k;
+                    });
                     break;
                 case { PreCheckoutQuery: { } preCheckoutQuery }:
                     if (PreCheckoutHandler != null) await PreCheckoutHandler(client, preCheckoutQuery, ctx);
