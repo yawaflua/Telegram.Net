@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using System.Runtime.InteropServices.JavaScript;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -15,31 +14,32 @@ using static System.Reflection.BindingFlags;
 
 namespace Telegram.Net.Services;
 
+[SuppressMessage("ReSharper", "ReturnValueOfPureMethodIsNotUsed")]
 public class TelegramHostedService : IHostedService
 {
-    private IServiceCollection isc { get; }
-    internal TelegramBotClient Client { get; set; }
-    private ITelegramBotConfig Config { get; }
-    internal Dictionary<string, Func<ITelegramBotClient, Message, CancellationToken, Task>> CommandHandler { get; set; } = new();
-    internal List<Func<ITelegramBotClient, Message, CancellationToken, Task>> EditedMessageHandler { get; set; } = new();
-    internal Dictionary<string, Func<ITelegramBotClient, CallbackQuery,CancellationToken, Task>> CallbackQueryHandler { get; set; } = new();
-    internal Dictionary<string, Func<ITelegramBotClient, InlineQuery ,CancellationToken, Task>> InlineHandler { get; set; } = new();
+    private IServiceCollection ServiceCollection { get; } = null!;
+    internal TelegramBotClient Client { get; set; } = null!;
+    private ITelegramBotConfig Config { get; } = null!;
+    internal Dictionary<string, Func<ITelegramBotClient, Message, CancellationToken, Task>?> CommandHandler { get; set; } = new();
+    internal List<Func<ITelegramBotClient, Message, CancellationToken, Task>?> EditedMessageHandler { get; set; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, CallbackQuery, CancellationToken, Task>?> CallbackQueryHandler { get; set; } = new();
+    internal Dictionary<string, Func<ITelegramBotClient, InlineQuery, CancellationToken, Task>?> InlineHandler { get; set; } = new();
     internal Func<ITelegramBotClient, PreCheckoutQuery,CancellationToken, Task>? PreCheckoutHandler { get; set; }
-    internal List<Func<ITelegramBotClient, Update, CancellationToken, Task>> DefaultUpdateHandler { get; set; } = new();
-    internal static ILogger<TelegramHostedService> _logger;
+    internal List<Func<ITelegramBotClient, Update, CancellationToken, Task>?> DefaultUpdateHandler { get; set; } = new();
+    internal static ILogger<TelegramHostedService> Logger = null!;
     
-    public TelegramHostedService(ITelegramBotConfig config, IServiceCollection isc, ILogger<TelegramHostedService> logger)
+    public TelegramHostedService(ITelegramBotConfig config, IServiceCollection serviceCollection, ILogger<TelegramHostedService> logger)
     {
         try
         {
-            _logger = logger;
+            Logger = logger;
             Client = new TelegramBotClient(config.Token);
             Config = config;
-            this.isc = isc;
+            this.ServiceCollection = serviceCollection;
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.Critical, new EventId(), ex, "Catched exception when creating TelegramHostedService: ");
+            Logger.Log(LogLevel.Critical, new EventId(), ex, "Catched exception when creating TelegramHostedService: ");
         }
     }
     internal static bool IsValidHandlerMethod(MethodInfo method, Type parameterType)
@@ -55,12 +55,12 @@ public class TelegramHostedService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Catched exception in parsing and checking params.");
+            Logger.LogError(ex, "Catched exception in parsing and checking params.");
             return false;
         }
     }
 
-    internal static Func<ITelegramBotClient, T, CancellationToken, Task> CreateDelegate<T>(MethodInfo method)
+    internal static Func<ITelegramBotClient, T, CancellationToken, Task>? CreateDelegate<T>(MethodInfo method)
     {
         try
         {
@@ -70,7 +70,7 @@ public class TelegramHostedService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.Critical, new EventId(), ex, "Catched exception in CreateDelegate function: ");
+            Logger.Log(LogLevel.Critical, new EventId(), ex, "Catched exception in CreateDelegate function: ");
             return null;
         }
 
@@ -106,10 +106,10 @@ public class TelegramHostedService : IHostedService
 
                 if (methods.Count == 0)
                 {
-                    _logger.LogWarning("No methods found with required attributes");
+                    Logger.LogWarning("No methods found with required attributes");
                 }
                 
-                var isp = isc.BuildServiceProvider();
+                var isp = ServiceCollection.BuildServiceProvider();
                 foreach (var method in methods)
                 {
                     var declaringType = method.DeclaringType!;
@@ -156,7 +156,7 @@ public class TelegramHostedService : IHostedService
             }
             catch (Exception ex)
             {
-                _logger.Log(LogLevel.Critical, new EventId(), ex, "Catched new exception when added methods: ");
+                Logger.Log(LogLevel.Critical, new EventId(), ex, "Catched new exception when added methods: ");
             }
         }, cancellationToken);
     }
@@ -171,25 +171,26 @@ public class TelegramHostedService : IHostedService
                 case { Message: { } message }:
                     CommandHandler.Where(k => message.Text!.StartsWith(k.Key)).Select(async k =>
                     {
-                        await k.Value(client, message, ctx);
+                        await k.Value!(client, message, ctx);
                         return k;
                     });
                     break;
                 case { EditedMessage: { } message }:
-                    EditedMessageHandler.ForEach(async k => await k(client, message, ctx));
+                    // ReSharper disable once AsyncVoidLambda
+                    EditedMessageHandler.ForEach(async k => await k!(client, message, ctx));
                     break;
                 case { CallbackQuery: { } callbackQuery }:
                     CallbackQueryHandler.Where(k => callbackQuery.Data!.StartsWith(k.Key))
                         .Select(async k =>
                         {
-                            await k.Value(client, callbackQuery, ctx);
+                            await k.Value!(client, callbackQuery, ctx);
                             return k;
                         });
                     break;
                 case { InlineQuery: { } inlineQuery }:
                     InlineHandler.Where(k => inlineQuery.Id.StartsWith(k.Key)).Select(async k =>
                     {
-                        await k.Value(client, inlineQuery, ctx);
+                        await k.Value!(client, inlineQuery, ctx);
                         return k;
                     });
                     break;
@@ -197,13 +198,17 @@ public class TelegramHostedService : IHostedService
                     if (PreCheckoutHandler != null) await PreCheckoutHandler(client, preCheckoutQuery, ctx);
                     break;
                 default:
-                    DefaultUpdateHandler.ForEach(async k => await k(client, update, ctx));
+                    // ReSharper disable once AsyncVoidLambda
+                    DefaultUpdateHandler.ForEach(async k => await k!(client, update, ctx));
                     break;
             }
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.Error, new EventId(), ex, "Catched exception in UpdateHandler: ");
+            if (ex is KeyNotFoundException)
+                Logger.Log(LogLevel.Warning, new EventId(), ex, "Key not found: ");
+            else 
+                Logger.Log(LogLevel.Error, new EventId(), ex, "Caught exception in UpdateHandler: ");
         }
     }
     
@@ -220,7 +225,7 @@ public class TelegramHostedService : IHostedService
                 UpdateHandler,
                 Config.errorHandler ?? ((_, ex, _) =>
                 {
-                    _logger.LogError(ex, "Catched error in telegram bot working: ");
+                    Logger.LogError(ex, "Catched error in telegram bot working: ");
                     return Task.CompletedTask;
                 }),
                 Config.ReceiverOptions,
@@ -228,7 +233,7 @@ public class TelegramHostedService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.Log(LogLevel.Critical, new EventId(), ex, "Failed to start. Catched exception: ");
+            Logger.Log(LogLevel.Critical, new EventId(), ex, "Failed to start. Catched exception: ");
         }
     }
 
@@ -240,7 +245,7 @@ public class TelegramHostedService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "Failed to stop. Exception: ");
+            Logger.LogCritical(ex, "Failed to stop. Exception: ");
         }
     }
 }
